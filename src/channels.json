@@ -1,0 +1,319 @@
+[
+ {
+  "name": "TechZone",
+  "cat": "tech",
+  "sub": 2,
+  "use": true,
+  "id": "UC6H07z6zAwbHRl4Lbl0GSsw",
+  "found_as": "TechZone",
+  "icon": "icons/UC6H07z6zAwbHRl4Lbl0GSsw.jpg"
+ },
+ {
+  "name": "Explaining Computers",
+  "cat": "tech",
+  "sub": 4,
+  "use": true,
+  "id": "UCbiGcwDWZjz05njNPrJU7jA",
+  "found_as": "ExplainingComputers",
+  "icon": "icons/UCbiGcwDWZjz05njNPrJU7jA.jpg"
+ },
+ {
+  "name": "Techlore",
+  "cat": "tech",
+  "sub": 2,
+  "use": true,
+  "id": "UCs6KfncB4OV6Vug4o_bzijg",
+  "found_as": "Techlore",
+  "icon": "icons/UCs6KfncB4OV6Vug4o_bzijg.jpg"
+ },
+ {
+  "name": "All Things Secured",
+  "cat": "tech",
+  "sub": 3,
+  "use": true,
+  "id": "UCvFGf8HZGZWFzpcDCqb3Lhw",
+  "found_as": "All Things Secured",
+  "icon": "icons/UCvFGf8HZGZWFzpcDCqb3Lhw.jpg"
+ },
+ {
+  "name": "TechHut",
+  "cat": "tech",
+  "sub": 1,
+  "use": true,
+  "id": "UCjSEJkpGbcZhvo0lr-44X_w",
+  "found_as": "TechHut",
+  "icon": "icons/UCjSEJkpGbcZhvo0lr-44X_w.jpg"
+ },
+ {
+  "name": "AI Explained",
+  "cat": "tech",
+  "sub": 4,
+  "use": true,
+  "id": "UCNJ1Ymd5yFuUPtn21xtRbbw",
+  "found_as": "AI Explained",
+  "icon": "icons/UCNJ1Ymd5yFuUPtn21xtRbbw.jpg"
+ },
+ {
+  "name": "The Linux Experiment",
+  "cat": "tech",
+  "sub": 4,
+  "use": false,
+  "id": null
+ },
+ {
+  "name": "Jeff Geerling",
+  "cat": "tech",
+  "sub": 1,
+  "use": false,
+  "id": null
+ },
+ {
+  "name": "Wolfgang's Channel",
+  "cat": "tech",
+  "sub": 1,
+  "use": false,
+  "id": null
+ },
+ {
+  "name": "Matt Wolfe",
+  "cat": "tech",
+  "sub": 0,
+  "use": false,
+  "id": null
+ },
+ {
+  "name": "Futurepedia",
+  "cat": "tech",
+  "sub": 0,
+  "use": false,
+  "id": null
+ },
+ {
+  "name": "daily MOTIVATION",
+  "cat": "self",
+  "sub": 1,
+  "use": true,
+  "id": "UCK9i-t1GwUeVVmddPCCdqCg",
+  "found_as": "daily MOTIVATION",
+  "icon": "icons/UCK9i-t1GwUeVVmddPCCdqCg.jpg"
+ },
+ {
+  "name": "Gaiea Sanskrit",
+  "cat": "self",
+  "sub": 3,
+  "use": true,
+  "id": "UCl4l2tOcEw3oNmjcy6zDPjw",
+  "found_as": "Gaiea Sanskrit",
+  "icon": "icons/UCl4l2tOcEw3oNmjcy6zDPjw.jpg"
+ },
+ {
+  "name": "Jordan B Peterson",
+  "cat": "self",
+  "sub": 4,
+  "use": true,
+  "id": "UCL_f53ZEJxp8TtlOkHwMV9Q",
+  "found_as": "Jordan B Peterson",
+  "icon": "icons/UCL_f53ZEJxp8TtlOkHwMV9Q.jpg"
+ },
+ {
+  "name": "Kitaro Waga",
+  "cat": "self",
+  "sub": 3,
+  "use": true,
+  "id": "UCTK2BYjS9td2yNn_hxwNHlw",
+  "found_as": "Kitaro Waga",
+  "icon": "icons/UCTK2BYjS9td2yNn_hxwNHlw.jpg"
+ },
+ {
+  "name": "LITTLE BIT BETTER",
+  "cat": "self",
+  "sub": 0,
+  "use": true,
+  "id": "UCmbF1cyNa6y7uNYiqYmSVJw",
+  "found_as": "LITTLE BIT BETTER",
+  "icon": "icons/UCmbF1cyNa6y7uNYiqYmSVJw.jpg"
+ },
+ {
+  "name": "Nigel Watson",
+  "cat": "self",
+  "sub": 4,
+  "use": true,
+  "id": "UCwwsmLc3l6rtFynK7A_EQAA",
+  "found_as": "Nigel Watson",
+  "icon": "icons/UCwwsmLc3l6rtFynK7A_EQAA.jpg"
+ },
+ {
+  "name": "School of Philosophy and Economic Science",
+  "cat": "self",
+  "sub": 3,
+  "use": true,
+  "id": "UCaNdbXZJ2srFbkwtZtXSqxw",
+  "found_as": "School of Philosophy and Economic Science",
+  "icon": "icons/UCaNdbXZJ2srFbkwtZtXSqxw.jpg"
+ },
+ {
+  "name": "The Diary Of A CEO",
+  "cat": "self",
+  "sub": 4,
+  "use": true,
+  "id": "UCGq-a57w-aPwyi3pW7XLiHw",
+  "found_as": "The Diary Of A CEO",
+  "icon": "icons/UCGq-a57w-aPwyi3pW7XLiHw.jpg"
+ },
+ {
+  "name": "The Diary Of A CEO Clips",
+  "cat": "self",
+  "sub": 4,
+  "use": true,
+  "id": "UCnjgxChqYYnyoqO4k_Q1d6Q",
+  "found_as": "The Diary Of A CEO Clips",
+  "icon": "icons/UCnjgxChqYYnyoqO4k_Q1d6Q.jpg"
+ },
+ {
+  "name": "The Yoga Institute",
+  "cat": "self",
+  "sub": 3,
+  "use": true,
+  "id": "UCihUiDJzjyo2ov_qGtW33lw",
+  "found_as": "The Yoga Institute",
+  "icon": "icons/UCihUiDJzjyo2ov_qGtW33lw.jpg"
+ },
+ {
+  "name": "ThinkZone",
+  "cat": "self",
+  "sub": 0,
+  "use": true,
+  "id": "UCLU1yXpciGbbPTOmCcKlYgA",
+  "found_as": "ThinkZone",
+  "icon": "icons/UCLU1yXpciGbbPTOmCcKlYgA.jpg"
+ },
+ {
+  "name": "Wim Hof",
+  "cat": "self",
+  "sub": 3,
+  "use": true,
+  "id": "UCxHTM1FYxeC4F7xDsBVltGg",
+  "found_as": "Wim Hof",
+  "icon": "icons/UCxHTM1FYxeC4F7xDsBVltGg.jpg"
+ },
+ {
+  "name": "MariMari142",
+  "cat": "self",
+  "sub": 1,
+  "use": false,
+  "id": null
+ },
+ {
+  "name": "Charles Dowding",
+  "cat": "garden",
+  "sub": 1,
+  "use": true,
+  "id": "UCB1J6siDdmhwah7q0O2WJBg",
+  "found_as": "Charles Dowding",
+  "icon": "icons/UCB1J6siDdmhwah7q0O2WJBg.jpg"
+ },
+ {
+  "name": "GrowVeg",
+  "cat": "garden",
+  "sub": 1,
+  "use": true,
+  "id": "UC9r61qohBg1qgGty4_WzojA",
+  "found_as": "GrowVeg",
+  "icon": "icons/UC9r61qohBg1qgGty4_WzojA.jpg"
+ },
+ {
+  "name": "Huw Richards",
+  "cat": "garden",
+  "sub": 1,
+  "use": true,
+  "id": "UCeaKRrrpWiQFJJmiuon2WoQ",
+  "found_as": "Huw Richards",
+  "icon": "icons/UCeaKRrrpWiQFJJmiuon2WoQ.jpg"
+ },
+ {
+  "name": "Steve's Seaside Kitchen Garden & Allotment",
+  "cat": "garden",
+  "sub": 1,
+  "use": false,
+  "id": null,
+  "check": true
+ },
+ {
+  "name": "George’s Jungle Garden",
+  "cat": "garden",
+  "sub": 3,
+  "use": true,
+  "id": "UC7HYgbYEkOMG3cF-mjNAzDw",
+  "found_as": "George’s Jungle Garden",
+  "icon": "icons/UC7HYgbYEkOMG3cF-mjNAzDw.jpg"
+ },
+ {
+  "name": "Grow Paradise",
+  "cat": "garden",
+  "sub": 3,
+  "use": true,
+  "id": "UCgxrmbI_8RyRDyZ35QNQWXg",
+  "found_as": "Grow Paradise",
+  "icon": "icons/UCgxrmbI_8RyRDyZ35QNQWXg.jpg"
+ },
+ {
+  "name": "Yorkshire Kris Exotic Gardening",
+  "cat": "garden",
+  "sub": 3,
+  "use": true,
+  "id": "UCFa7yNZ1pfVM1IZrt0ERSIA",
+  "found_as": "Yorkshire Kris Exotic Gardening",
+  "icon": "icons/UCFa7yNZ1pfVM1IZrt0ERSIA.jpg"
+ },
+ {
+  "name": "Happy Bellyfish",
+  "cat": "kitchen",
+  "sub": 1,
+  "use": true,
+  "id": "UCQF6W88T-oJR2EflQYFYmig",
+  "found_as": "Happy Bellyfish",
+  "icon": "icons/UCQF6W88T-oJR2EflQYFYmig.jpg"
+ },
+ {
+  "name": "We Cook Vegan",
+  "cat": "kitchen",
+  "sub": 0,
+  "use": false,
+  "id": null,
+  "check": true
+ },
+ {
+  "name": "Living Springs Retreat",
+  "cat": "kitchen",
+  "sub": 0,
+  "use": false,
+  "id": null
+ },
+ {
+  "name": "Sky Sports Premier League",
+  "cat": "sport",
+  "sub": 2,
+  "use": true,
+  "id": "UCNAf1k0yIjyGu3k9BwAg3lg",
+  "found_as": "Sky Sports Premier League",
+  "icon": "icons/UCNAf1k0yIjyGu3k9BwAg3lg.jpg"
+ },
+ {
+  "name": "Thoughty2",
+  "cat": "interesting",
+  "sub": 0,
+  "use": true,
+  "id": "UCRlICXvO4XR4HMeEB9JjDlA",
+  "found_as": "Thoughty2",
+  "icon": "icons/UCRlICXvO4XR4HMeEB9JjDlA.jpg"
+ },
+ {
+  "name": "Some random guy",
+  "cat": "interesting",
+  "sub": 1,
+  "use": true,
+  "id": "UC-_cAYaeuq2w0T6aZFdVP7Q",
+  "found_as": "Some random guy",
+  "icon": "icons/UC-_cAYaeuq2w0T6aZFdVP7Q.jpg"
+ }
+]

@@ -1,0 +1,1 @@
+window.DAYBOOK_THUMBS = {};

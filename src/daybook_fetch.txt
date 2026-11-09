@@ -1,0 +1,600 @@
+#!/usr/bin/env python3
+"""
+Daybook feed fetcher - Stage 1.
+
+Run it from a terminal:   python3 ~/Projects/Daybook/daybook_fetch.py
+
+What it does, in plain words:
+  1. Reads your channel list (channels.json, next to this script).
+     If you saved channel changes from the Daybook page, it picks up the
+     newest "daybook-channels.json" from your Downloads folder first.
+  2. Finds each channel's YouTube ID the first time (by a normal YouTube
+     search for its name) and remembers it.
+  3. Reads each channel's public list of new uploads. No account,
+     sign-in or API key is needed.
+  4. Looks up each new video's length once, skipping Shorts.
+  5. Saves a small copy of each channel's icon (once) and each video's
+     picture into the icons and thumbs folders here, so the page can show
+     them without contacting the internet.
+  6. Runs your saved topic searches (Your topics and Beyond your channels),
+     from topics.json here. Topic changes saved from the page arrive as
+     "daybook-topics.json" in Downloads and are picked up first.
+  7. Lets in Shorts only when they're on an AI Field Guide subject.
+  8. Writes feed.js, which the Daybook page (daybook.html) reads, and
+     fetch_report.txt, which says what happened.
+
+It uses only what comes with Python, so there's nothing to install.
+"""
+import base64
+import json, os, re, sys, time, html, glob, shutil
+import urllib.request, urllib.parse, urllib.error
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone, timedelta
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CHANNELS = os.path.join(HERE, "channels.json")
+CACHE = os.path.join(HERE, "cache.json")
+FEED_JS = os.path.join(HERE, "feed.js")
+REPORT = os.path.join(HERE, "fetch_report.txt")
+DOWNLOADS = os.path.expanduser("~/Downloads")
+ICONS = os.path.join(HERE, "icons")
+THUMBS = os.path.join(HERE, "thumbs")
+TOPICS = os.path.join(HERE, "topics.json")
+PER_SEARCH = 6          # results kept per topic search
+
+# AI Field Guide subjects: Shorts on these are let in (other Shorts are skipped)
+FIELD_GUIDE = re.compile(r"\b(vpns?|fingerprint\w*|yubikeys?|security keys?|passkeys?|password managers?|2fa|two[- ]factor|authenticator|smart tvs?|nvidia shield|routers?|wi-?fi security|email alias\w*|data brokers?|gdpr|sim[- ]swap\w*|scams?|phishing|data breach\w*|browser (extensions?|add-?ons?)|metadata|threat model\w*|local (ai|llms?|models?)|lm studio|ollama|hugging ?face|prompt\w*|api keys?|ai agents?)\b", re.I)
+
+DEFAULT_TOPICS = [
+    {"q": "YubiKey tutorial for beginners", "kind": "mine", "cat": "tech"},
+    {"q": "Linux news this week", "kind": "trend", "cat": "tech"},
+    {"q": "AI news this week", "kind": "trend", "cat": "tech"},
+    {"q": "local AI on older hardware", "kind": "trend", "cat": "tech"},
+    {"q": "China open source AI models", "kind": "trend", "cat": "tech"},
+    {"q": "privacy news this week", "kind": "trend", "cat": "tech"},
+    {"q": "self-hosting for beginners", "kind": "trend", "cat": "tech"},
+    {"q": "browser fingerprinting explained", "kind": "trend", "cat": "tech"},
+    {"q": "home router security settings", "kind": "trend", "cat": "tech"},
+    {"q": "organic gardening UK this month", "kind": "trend", "cat": "garden"},
+]
+
+KEEP_DAYS = 60          # ignore videos older than this
+PER_CHANNEL = 8         # newest videos kept per channel
+PAUSE = 0.6             # seconds between requests, to be polite
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
+    "Accept-Language": "en-GB,en;q=0.9",
+    # Skips YouTube's cookie-consent page, which UK visitors otherwise get first.
+    "Cookie": "SOCS=CAI; CONSENT=YES+1",
+}
+NS = {"a": "http://www.w3.org/2005/Atom",
+      "yt": "http://www.youtube.com/xml/schemas/2015",
+      "media": "http://search.yahoo.com/mrss/"}
+
+report = []
+def log(msg):
+    print(msg)
+    report.append(msg)
+
+def get(url, timeout=25):
+    req = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "replace")
+
+def get_bytes(url, timeout=25):
+    req = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+def save_image(url, path):
+    """Save a picture once. Returns True if it's there now."""
+    if os.path.exists(path):
+        return True
+    try:
+        data = get_bytes(url)
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+    if len(data) < 500:          # not a real picture
+        return False
+    tmp = path + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(data)
+    os.replace(tmp, path)
+    return True
+
+def channel_icon(c):
+    """Find and save the channel's icon the first time. Sets c["icon"]."""
+    path = os.path.join(ICONS, c["id"] + ".jpg")
+    if not os.path.exists(path):
+        try:
+            page = get("https://www.youtube.com/channel/" + c["id"])
+        except (urllib.error.URLError, OSError):
+            return False
+        m = re.search(r'<meta property="og:image" content="([^"]+)"', page)
+        if not m:
+            return False
+        url = re.sub(r"=s\d+", "=s88", html.unescape(m.group(1)), count=1)
+        time.sleep(PAUSE)
+        if not save_image(url, path):
+            return False
+    c["icon"] = "icons/" + c["id"] + ".jpg"
+    return True
+
+def load_json(path, default):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+def save_json(path, data):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, path)
+
+# ---------- 1. channel list ----------
+def merge_downloaded_changes(chans):
+    """Take channel changes saved from the Daybook page (Downloads folder)."""
+    files = sorted(glob.glob(os.path.join(DOWNLOADS, "daybook-channels*.json")), key=os.path.getmtime)
+    if not files:
+        return chans
+    newest = files[-1]
+    if os.path.getmtime(newest) <= os.path.getmtime(CHANNELS):
+        return chans
+    new = load_json(newest, None)
+    if not isinstance(new, list):
+        log("! Couldn't read " + os.path.basename(newest) + ", so I kept your old channel list.")
+        return chans
+    known = {c["name"].lower(): c for c in chans}
+    for c in new:
+        old = known.get(c.get("name", "").lower())
+        if c.get("link") and not (old and old.get("link") == c.get("link")):
+            c["id"] = None          # a new link was pasted, so look it up again
+            continue
+        if old and old.get("id") and not c.get("id"):
+            c["id"] = old["id"]
+            c["found_as"] = old.get("found_as")
+    try:
+        shutil.copyfile(CHANNELS, CHANNELS + ".backup")   # contents only: the storage drive refuses permission copying
+    except OSError as err:
+        log("(Couldn't refresh channels.json.backup: " + str(err)[:80] + ". Carrying on.)")
+    log("Picked up your channel changes from " + os.path.basename(newest) + " (old list kept as channels.json.backup).")
+    return new
+
+# ---------- 2. find channel IDs ----------
+def clean_title(t):
+    try:
+        t = json.loads('"' + t + '"')
+    except ValueError:
+        pass
+    return html.unescape(t)
+
+def norm(s):
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+def is_link(text):
+    return text.startswith("@") or "youtube.com/" in text
+
+def channel_from_link(link):
+    """A channel link or @handle -> (channel ID, channel title)."""
+    link = link.strip()
+    m = re.search(r"/channel/(UC[\w-]{22})", link)
+    if link.startswith("@"):
+        url = "https://www.youtube.com/" + link
+    elif link.startswith("http"):
+        url = link
+    else:
+        url = "https://" + link
+    page = get(url)
+    cid = m.group(1) if m else None
+    if not cid:
+        m2 = re.search(r'"externalId":"(UC[\w-]{22})"', page) or re.search(r'<meta itemprop="identifier" content="(UC[\w-]{22})"', page)
+        cid = m2.group(1) if m2 else None
+    t = re.search(r'<meta property="og:title" content="([^"]*)"', page)
+    return cid, (html.unescape(t.group(1)) if t else None)
+
+def find_channel_id(name):
+    url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(name) + "&sp=EgIQAg%253D%253D"
+    page = get(url)
+    hits = re.findall(r'"channelRenderer":\{"channelId":"(UC[\w-]{22})","title":\{"simpleText":"(.*?)"\}', page)
+    if not hits:
+        return None, None
+    hits = [(cid, clean_title(t)) for cid, t in hits]
+    for cid, title in hits:
+        if norm(title) == norm(name):
+            return cid, title
+    return hits[0]
+
+# ---------- 3. uploads ----------
+def chapters_from(desc):
+    out = []
+    for line in desc.splitlines():
+        m = re.match(r"^\s*[\(\[]?((?:\d{1,2}:)?\d{1,2}:\d{2})[\)\]]?\s*[-–—:|]?\s*(.+?)\s*$", line)
+        if m and len(m.group(2)) > 1:
+            out.append([m.group(1), m.group(2)[:90]])
+    return out if len(out) >= 2 else []
+
+def summary_from(desc):
+    keep = []
+    for line in desc.splitlines():
+        line = re.sub(r"https?://\S+", "", line).strip()
+        if not line or re.match(r"^[\(\[]?(?:\d{1,2}:)?\d{1,2}:\d{2}", line) or line.startswith("#"):
+            continue
+        keep.append(line)
+        if len(" ".join(keep)) > 300:
+            break
+    return " ".join(keep)[:320]
+
+def links_from(desc):
+    out = []
+    for u in re.findall(r"https?://[^\s<>\"')\]]+", desc):
+        u = re.sub(r"[.,;:!?]+$", "", u)
+        if u not in out:
+            out.append(u)
+    return out[:40]
+
+def read_uploads(cid):
+    xml = get("https://www.youtube.com/feeds/videos.xml?channel_id=" + cid)
+    root = ET.fromstring(xml)
+    vids = []
+    for e in root.findall("a:entry", NS):
+        vid = e.findtext("yt:videoId", default="", namespaces=NS)
+        link_el = e.find("a:link", NS)
+        link = link_el.get("href") if link_el is not None else "https://www.youtube.com/watch?v=" + vid
+        title = e.findtext("a:title", default="", namespaces=NS)
+        is_short = "/shorts/" in link
+        if is_short and not FIELD_GUIDE.search(title):
+            continue
+        desc = e.findtext("media:group/media:description", default="", namespaces=NS) or ""
+        thumb = e.find("media:group/media:thumbnail", NS)
+        vids.append({
+            "id": vid,
+            "title": e.findtext("a:title", default="", namespaces=NS),
+            "url": "https://www.youtube.com/watch?v=" + vid,
+            "published": e.findtext("a:published", default="", namespaces=NS),
+            "summary": summary_from(desc),
+            "chapters": chapters_from(desc),
+            "links": links_from(desc),
+            "thumb": thumb.get("url") if thumb is not None else "",
+            "short": is_short,
+        })
+    return vids
+
+# ---------- topic searches ----------
+def merge_downloaded_topics(topics):
+    """Take topic changes saved from the Daybook page (Downloads folder)."""
+    files = sorted(glob.glob(os.path.join(DOWNLOADS, "daybook-topics*.json")), key=os.path.getmtime)
+    if not files:
+        return topics
+    newest = files[-1]
+    if os.path.exists(TOPICS) and os.path.getmtime(newest) <= os.path.getmtime(TOPICS):
+        return topics
+    new = load_json(newest, None)
+    if not isinstance(new, list) or not all(isinstance(t, dict) and t.get("q") for t in new):
+        log("! Couldn't read " + os.path.basename(newest) + ", so I kept your old topics.")
+        return topics
+    log("Picked up your topic changes from " + os.path.basename(newest) + ".")
+    return [{"q": str(t["q"])[:120], "kind": t.get("kind", "mine"), "cat": t.get("cat") or "interesting"} for t in new]
+
+def length_secs(text):
+    try:
+        parts = [int(p) for p in (text or "").split(":")]
+    except ValueError:
+        return None
+    s = 0
+    for p in parts:
+        s = s * 60 + p
+    return s if parts else None
+
+def ago_days(text):
+    """'3 days ago' -> 3. Unknown -> None."""
+    m = re.search(r"(\d+)\s+(second|minute|hour|day|week|month|year)", text or "")
+    if not m:
+        return None
+    n, unit = int(m.group(1)), m.group(2)
+    return n * {"second": 0, "minute": 0, "hour": 0, "day": 1, "week": 7, "month": 30, "year": 365}[unit]
+
+def search_youtube(q):
+    """A normal YouTube search (uploads this month, videos only). Returns a list of results."""
+    page = get("https://www.youtube.com/results?search_query=" + urllib.parse.quote(q) + "&sp=EgQIBBAB")
+    m = re.search(r"var ytInitialData\s*=\s*(\{.*?\});\s*</script>", page, re.S)
+    if not m:
+        return []
+    data = json.loads(m.group(1))
+    found = []
+    def walk(x):
+        if isinstance(x, dict):
+            if "videoRenderer" in x and isinstance(x["videoRenderer"], dict):
+                found.append(x["videoRenderer"])
+                return
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+    walk(data)
+    out = []
+    for r in found:
+        vid = r.get("videoId")
+        if not vid:
+            continue
+        def text(key):
+            t = r.get(key) or {}
+            return t.get("simpleText") or "".join(x.get("text", "") for x in t.get("runs", []))
+        owner = (r.get("ownerText") or r.get("longBylineText") or {}).get("runs") or [{}]
+        cid = (((owner[0].get("navigationEndpoint") or {}).get("browseEndpoint")) or {}).get("browseId")
+        snip = ""
+        for s in r.get("detailedMetadataSnippets") or []:
+            snip = "".join(x.get("text", "") for x in (s.get("snippetText") or {}).get("runs", []))
+            break
+        secs = length_secs(text("lengthText"))
+        days = ago_days(text("publishedTimeText"))
+        out.append({
+            "id": vid,
+            "title": text("title"),
+            "url": "https://www.youtube.com/watch?v=" + vid,
+            "channel": owner[0].get("text", ""),
+            "channel_id": cid,
+            "minutes": round(secs / 60) if secs else None,
+            "secs": secs,
+            "published": (datetime.now(timezone.utc) - timedelta(days=days)).isoformat() if days is not None else "",
+            "ago": text("publishedTimeText"),
+            "summary": snip[:320],
+            "chapters": [],
+        })
+    return out
+
+def old_searches():
+    try:
+        with open(FEED_JS, encoding="utf-8") as f:
+            txt = f.read()
+        data = json.loads(txt[txt.index("{"):txt.rstrip().rstrip(";").rindex("}") + 1])
+    except (OSError, ValueError):
+        return {}
+    return {s.get("q", "").lower(): s for s in data.get("searches", [])}
+
+def run_searches(topics, chans):
+    """Each topic becomes a YouTube search; results feed Your topics and Beyond your channels."""
+    previous = old_searches()
+    mine_ids = {c.get("id") for c in chans if c.get("id")}
+    mine_names = {c["name"].lower() for c in chans}
+    out, ok, bad = [], 0, 0
+    for t in topics:
+        q = t["q"]
+        try:
+            res = search_youtube(q)
+            time.sleep(PAUSE)
+        except (urllib.error.URLError, OSError, ValueError) as err:
+            old = previous.get(q.lower())
+            if old:
+                out.append(old)
+            log("! Search \"" + q + "\": couldn't run (" + str(err)[:60] + "). Kept last time's results.")
+            bad += 1
+            continue
+        keep = []
+        for r in res:
+            if r["secs"] is not None and r["secs"] < 90 and not FIELD_GUIDE.search(r["title"]):
+                continue          # a Short off the Field Guide subjects
+            if r["minutes"] is not None and r["minutes"] > 90:
+                continue          # very long streams and lectures
+            r["yours"] = r.get("channel_id") in mine_ids or r["channel"].lower() in mine_names
+            r["short"] = r["secs"] is not None and r["secs"] < 90
+            r.pop("secs", None)
+            keep.append(r)
+            if len(keep) >= PER_SEARCH:
+                break
+        out.append({"q": q, "kind": t.get("kind", "mine"), "cat": t.get("cat"), "fetched": datetime.now(timezone.utc).isoformat(), "results": keep})
+        ok += 1
+    if topics:
+        log("Topic searches: " + str(ok) + " run" + (", " + str(bad) + " failed (old results kept)" if bad else "") + ".")
+    return out
+
+def video_length(vid):
+    """Seconds, or None. Also spots Shorts that slipped through."""
+    page = get("https://www.youtube.com/watch?v=" + vid)
+    m = re.search(r'"lengthSeconds":"(\d+)"', page)
+    return int(m.group(1)) if m else None
+
+# ---------- main ----------
+def load_old_feed():
+    """Videos from the last good feed.js, by channel, so a failed read keeps them."""
+    try:
+        with open(FEED_JS, encoding="utf-8") as f:
+            txt = f.read()
+        data = json.loads(txt[txt.index("{"):txt.rstrip().rstrip(";").rindex("}") + 1])
+    except (OSError, ValueError):
+        return {}
+    by = {}
+    for v in data.get("videos", []):
+        by.setdefault(v.get("channel"), []).append(v)
+    return by
+
+def main():
+    started = datetime.now()
+    log("Daybook fetch, " + started.strftime("%A %d %B %Y, %H:%M"))
+    chans = load_json(CHANNELS, None)
+    if not isinstance(chans, list):
+        log("! channels.json is missing or damaged. Restore it from channels.json.backup or ask Claude.")
+        open(REPORT, "w", encoding="utf-8").write("\n".join(report))
+        sys.exit(1)
+    chans = merge_downloaded_changes(chans)
+    cache = load_json(CACHE, {"lengths": {}})
+    lengths = cache.setdefault("lengths", {})
+    old_feed = load_old_feed()
+    reads_ok = 0
+    cutoff = datetime.now(timezone.utc) - timedelta(days=KEEP_DAYS)
+    videos, problems, new_ids = [], 0, 0
+    os.makedirs(ICONS, exist_ok=True)
+    os.makedirs(THUMBS, exist_ok=True)
+    no_icon = 0
+
+    for c in chans:
+        # feed channels, plus every library channel with a known id (for the subscriptions wall)
+        if not c.get("use") and not c.get("id"):
+            continue
+        wall_only = not c.get("use")
+        name = c["name"]
+        try:
+            if not c.get("id"):
+                link = c.get("link") or (name if is_link(name) else None)
+                if link:
+                    cid, found = channel_from_link(link)
+                    time.sleep(PAUSE)
+                    if not cid:
+                        log("? Couldn't open the link for \"" + name + "\". Check it's the channel's own page.")
+                        problems += 1
+                        continue
+                    c["id"], c["found_as"] = cid, found or name
+                    if is_link(name) and found:
+                        c["name"] = found
+                    new_ids += 1
+                    log("+ Found \"" + (found or name) + "\" from its link")
+                elif c.get("check"):
+                    log("? \"" + name + "\" is waiting for its channel link. Paste it into the Daybook (click the ! on its name).")
+                    problems += 1
+                    continue
+                else:
+                    cid, found = find_channel_id(name)
+                    time.sleep(PAUSE)
+                    if not cid:
+                        log("? Couldn't find a channel called \"" + name + "\". Paste its link into the Daybook instead.")
+                        problems += 1
+                        continue
+                    c["id"], c["found_as"] = cid, found
+                    new_ids += 1
+                    same = norm(found) == norm(name)
+                    if not same:
+                        c["check"] = True
+                        problems += 1
+                    log(("+ Found " if same else "? Please check: for \"" + name + "\" I found ") + "\"" + found + "\"" + ("" if same else ". If that's wrong, click the ! on its name in the Daybook and paste the right link."))
+            if not channel_icon(c):
+                no_icon += 1
+            ups = read_uploads(c["id"])
+            time.sleep(PAUSE)
+        except (urllib.error.URLError, ET.ParseError, OSError) as err:
+            carry = [v for v in old_feed.get(name, []) if v.get("published", "") >= cutoff.isoformat()[:10]]
+            videos.extend(carry)
+            log("! " + name + ": couldn't read new uploads (" + str(err)[:80] + "). Kept its " + str(len(carry)) + " videos from last time; it'll try again next time.")
+            problems += 1
+            continue
+        reads_ok += 1
+        kept = 0
+        for v in ups:
+            try:
+                when = datetime.fromisoformat(v["published"].replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if when < cutoff:
+                continue
+            if v["id"] not in lengths:
+                try:
+                    lengths[v["id"]] = video_length(v["id"])
+                except (urllib.error.URLError, OSError):
+                    lengths[v["id"]] = None
+                time.sleep(PAUSE)
+            secs = lengths.get(v["id"])
+            if secs is not None and secs < 90:      # a Short
+                if not FIELD_GUIDE.search(v["title"]):
+                    continue
+                v["short"] = True
+            if not v.get("short"):
+                v.pop("short", None)
+            v["minutes"] = max(1, round(secs / 60)) if secs else None
+            v["channel"] = name
+            v["cat"], v["sub"] = c["cat"], c["sub"]
+            if wall_only:
+                v["wall"] = True        # shown on the subscriptions wall only, not in the category feed
+            tpath = os.path.join(THUMBS, v["id"] + ".jpg")
+            if not os.path.exists(tpath):
+                save_image("https://i.ytimg.com/vi/" + v["id"] + "/mqdefault.jpg", tpath)
+                time.sleep(0.2)
+            if os.path.exists(tpath):
+                v["thumb_local"] = "thumbs/" + v["id"] + ".jpg"
+            videos.append(v)
+            kept += 1
+            if kept >= PER_CHANNEL:
+                break
+
+    if reads_ok == 0 and any(c.get("use") and c.get("id") for c in chans):
+        log("! No channel could be read, so there's probably no internet connection. Yesterday's feed is kept unchanged.")
+        with open(REPORT, "w", encoding="utf-8") as f:
+            f.write("\n".join(report) + "\n")
+        return
+
+    # icons for library channels that aren't in the feed: a few each night
+    extra = 0
+    for c in chans:
+        if c.get("use") or not c.get("id"):
+            continue
+        if os.path.exists(os.path.join(ICONS, c["id"] + ".jpg")):
+            c["icon"] = "icons/" + c["id"] + ".jpg"
+        elif extra < 20:
+            extra += 1
+            channel_icon(c)
+
+    # topic searches: Your topics and Beyond your channels
+    topics = load_json(TOPICS, None)
+    if not isinstance(topics, list):
+        topics = DEFAULT_TOPICS
+    topics = merge_downloaded_topics(topics)
+    save_json(TOPICS, topics)
+    searches = run_searches(topics, chans)
+    for s in searches:
+        for r in s.get("results", []):
+            tpath = os.path.join(THUMBS, r["id"] + ".jpg")
+            if not os.path.exists(tpath):
+                save_image("https://i.ytimg.com/vi/" + r["id"] + "/mqdefault.jpg", tpath)
+                time.sleep(0.2)
+            if os.path.exists(tpath):
+                r["thumb_local"] = "thumbs/" + r["id"] + ".jpg"
+
+    # forget lengths for videos no longer in any feed, so the cache stays small
+    live = {v["id"] for v in videos}
+    live_pics = live | {r["id"] for s in searches for r in s.get("results", [])}
+    cache["lengths"] = {k: s for k, s in lengths.items() if k in live}
+    save_json(CACHE, cache)
+    # tidy away pictures of videos no longer in the feed
+    for fn in os.listdir(THUMBS):
+        if fn.endswith(".jpg") and fn[:-4] not in live_pics:
+            try:
+                os.remove(os.path.join(THUMBS, fn))
+            except OSError:
+                pass
+    save_json(CHANNELS, chans)
+
+    videos.sort(key=lambda v: v["published"], reverse=True)
+    # pictures for Moment notebooks: the page can't read image files itself, so keep them as text in thumbs.js
+    thumbs = {}
+    wall_ids = {v["id"] for v in videos if v.get("wall")}   # wall-only videos keep their picture file but stay out of thumbs.js, so the page stays quick
+    for vid_id in live_pics - wall_ids:
+        tp = os.path.join(THUMBS, vid_id + ".jpg")
+        if os.path.exists(tp):
+            try:
+                with open(tp, "rb") as f:
+                    thumbs[vid_id] = base64.b64encode(f.read()).decode("ascii")
+            except OSError:
+                pass
+    with open(os.path.join(HERE, "thumbs.js"), "w", encoding="utf-8") as f:
+        f.write("window.DAYBOOK_THUMBS = ")
+        json.dump(thumbs, f)
+        f.write(";\n")
+    feed = {"generated": datetime.now(timezone.utc).isoformat(), "channels": chans, "videos": videos, "topics": topics, "searches": searches}
+    with open(FEED_JS, "w", encoding="utf-8") as f:
+        f.write("window.DAYBOOK_FEED = ")
+        json.dump(feed, f, ensure_ascii=False)
+        f.write(";\n")
+    used = sum(1 for c in chans if c.get("use"))
+    wall = sum(1 for c in chans if c.get("id") and not c.get("use"))
+    log("Done: " + str(len(videos)) + " videos from " + str(used) + " feed channels and " + str(wall) + " more on the subscriptions wall"
+        + (", " + str(new_ids) + " channels found for the first time" if new_ids else "")
+        + (", " + str(problems) + " to check above" if problems else "") + ".")
+    if no_icon:
+        log("(" + str(no_icon) + (" channel has" if no_icon == 1 else " channels have") + " no icon yet, so initials show instead. It'll try again next time.)")
+    log("Open daybook.html to see them.")
+    with open(REPORT, "w", encoding="utf-8") as f:
+        f.write("\n".join(report) + "\n")
+
+if __name__ == "__main__":
+    main()
