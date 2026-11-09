@@ -955,7 +955,7 @@ const FRAMED=(()=>{try{return window.top!==window.self;}catch(e){return true;}})
    If PipePipe doesn't come up, the link is copied instead. No YouTube page is ever opened. */
 function launchApp(nh,web){if(nh.startsWith("intent:")){if(FRAMED){pipeTab(web);return;}
   let left=false;const away=()=>{left=true;};window.addEventListener("blur",away,{once:true});document.addEventListener("visibilitychange",away,{once:true});
-  location.href=nh;
+  const lk=document.createElement("a");lk.href=nh;lk.dataset.plain="1";lk.style.display="none";document.body.appendChild(lk);lk.click();setTimeout(()=>lk.remove(),1000);
   setTimeout(()=>{window.removeEventListener("blur",away);document.removeEventListener("visibilitychange",away);if(left||document.hidden)return;pipeTab(web);},2000);return;}let w=null;try{w=window.open(nh,"_blank");}catch(e){}
   if(!w){const a=document.createElement("a");a.href=nh;a.target="_top";a.dataset.plain="1";a.style.display="none";document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),1000);}
   if(!nh.startsWith("intent:"))return;
@@ -972,8 +972,10 @@ function viaChoice(href){const c=openChoice();if(c.app==="youtube")return href;l
   if(!/(^|\.)youtube\.com$/.test(u.hostname))return href;if(c.app==="freetube")return "freetube://"+href;if(c.app==="pipepipe")return /^\/(watch|shorts\/|live\/)/.test(u.pathname)?pipeLink(u):href;
   if(c.app==="invidious"&&c.host){const h=c.host.trim().replace(/^https?:\/\//,"").replace(/\/.*$/,"");const path=u.pathname==="/results"?"/search?q="+encodeURIComponent(u.searchParams.get("search_query")||""):u.pathname+u.search;return "https://"+h+path;}
   return href;}
-document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[href]");if(!a||a.dataset.plain)return;const nh=viaChoice(a.href);if(nh===a.href)return;e.preventDefault();
-  if(nh.startsWith("freetube:")||nh.startsWith("intent:"))launchApp(nh,a.href);else window.open(nh,"_blank","noopener,noreferrer");},true);
+document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[href]");if(!a||a.dataset.plain)return;const web=a.dataset.web||a.href;const nh=viaChoice(web);if(nh===web){if(a.dataset.web){a.href=web;delete a.dataset.web;}return;}
+  if(nh.startsWith("intent:")&&!FRAMED){a.dataset.web=web;a.href=nh;a.removeAttribute("target");return;}
+  e.preventDefault();
+  if(nh.startsWith("freetube:")||nh.startsWith("intent:"))launchApp(nh,web);else window.open(nh,"_blank","noopener,noreferrer");},true);
 
 /* icons */
 const PALETTE=["#5a43d6","#ee6c12","#25964a","#d4366b","#1f6fd1","#0e8f8a","#b8860b","#8a2f6b","#c8332b","#4f5d75"];
@@ -1937,7 +1939,8 @@ function drawActs(v){const a=$("pacts");a.innerHTML="";
   mk("✕ Not for me",()=>{S.status[v.id]="no";save();draw();toast("Taken off New videos. Put it back from ⏱ Watch later.");},null,S.status[v.id]==="no");
   mk("🔊",()=>speak(v.title+". "+(v.channel||"")+". "+(v.summary||"").slice(0,400))).title="Read the title and description aloud";
   mk("↗ YouTube",()=>openIn("youtube",v)).title="Open on YouTube in a new tab, from where you are";
-  if(IS_ANDROID)mk("↗ PipePipe",()=>openIn("pipepipe",v)).title="Open in the PipePipe app";else mk("↗ FreeTube",()=>openIn("freetube",v)).title="Open in the FreeTube app, from where you are";
+  if(IS_ANDROID&&!FRAMED){const pa=el("a","s3btn","↗ PipePipe");pa.dataset.plain="1";pa.title="Open in the PipePipe app";const setH=()=>{pa.href=pipeLink(new URL(atNow(v)));};setH();pa.addEventListener("pointerdown",setH);pa.addEventListener("click",()=>{remember(v);const f=$("player").querySelector("iframe");if(f&&st3.playing===v.id){try{f.contentWindow.postMessage(JSON.stringify({event:"command",func:"pauseVideo",args:[]}),"*");}catch(e){}}});a.appendChild(pa);}
+  else if(IS_ANDROID)mk("↗ PipePipe",()=>openIn("pipepipe",v)).title="Open in the PipePipe app";else mk("↗ FreeTube",()=>openIn("freetube",v)).title="Open in the FreeTube app, from where you are";
   if(HELPER)mk("📺",()=>toast("To cast: Brave menu ☰ → Cast… (turn on Media Router in brave://settings/extensions first). See ? Help → Casting to the TV."));
 }
 function atNow(v){const t=st3.playing===v.id?Math.floor(st3.time):0;return v.url+(t>5?"&t="+t+"s":"");}
