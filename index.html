@@ -1903,7 +1903,7 @@ function drawPlayer(){
     else{const b=el("button","s3poster");b.type="button";b.setAttribute("aria-label","Play "+v.title);
       if(v.thumb_local)b.style.backgroundImage="url('"+v.thumb_local+"')";
       b.appendChild(el("span","s3play"));
-      b.appendChild(el("span","s3hint",HELPER?"Click to play · double-click for full screen, Esc to return":(openChoice().app==="pipepipe"?"Tap to copy the link for PipePipe":"Click to open in "+openName()+" · start the Daybook helper to play here")));
+      b.appendChild(el("span","s3hint",HELPER?"Click to play · double-click for full screen, Esc to return":(openChoice().app==="pipepipe"?(FRAMED?"Tap to copy the link for PipePipe":"Tap to open in PipePipe"):"Click to open in "+openName()+" · start the Daybook helper to play here")));
       b.appendChild(el("span","s3chn",v.channel||""));if(v.minutes!=null)b.appendChild(el("span","s3dur",v.minutes+" min"));
       b.onclick=()=>play(v,0);p.appendChild(b);}
   }
