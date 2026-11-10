@@ -476,6 +476,20 @@ body:has(#tourbar:not([hidden])) .toast{bottom:110px}
 body.biglist .s3main{grid-template-rows:auto minmax(150px,1fr)}
 body.biglist .s3grid{max-height:46vh}
 .s3grid.idle{display:none}
+/* Narrow screens (10 Nov 2026): tablet held upright, or a narrow window. Nothing is cut off on the right: the top bar and menu rows wrap, and the player sits above the panel. Landscape (1100px and wider) is unchanged. */
+@media (max-width:1099px){
+  .page.s3{min-width:0;grid-template-rows:auto auto minmax(0,1fr)}
+  .s3top{grid-template-columns:minmax(0,1fr);row-gap:8px;padding:8px 12px}
+  .s3tr{flex-wrap:wrap;justify-content:flex-start;gap:8px}
+  .s3nav{flex-wrap:wrap;padding:0 12px;row-gap:4px}
+  .s3nav #cats{flex:1 1 100%;flex-wrap:wrap;min-height:46px}
+  .s3nav .cat{min-height:46px}
+  .s3subs{margin-left:0;flex-wrap:wrap;padding-bottom:6px}
+  .s3main{padding:10px 12px 6px;overflow-y:auto}
+  .s3feature{grid-template-columns:minmax(0,1fr);gap:12px}
+  .s3grip{flex:none}
+  .s3grip span{white-space:nowrap}
+}
 </style>
 </head>
 <body>
