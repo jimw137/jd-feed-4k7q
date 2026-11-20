@@ -1,0 +1,50 @@
+# Evening Daybook update, run by GitHub itself (no Claude permissions needed).
+# Runs every evening at about 19:38 UK time, and can also be started by hand
+# from the repository's Actions tab ("Run workflow").
+name: Evening feed
+on:
+  schedule:
+    - cron: "38 19 * * *"   # GitHub uses UTC: 19:38 in winter, 20:38 in summer
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: evening-feed
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build feed
+        run: |
+          W="$RUNNER_TEMP/nightly"; mkdir -p "$W/icons"
+          cp src/daybook_fetch.txt "$W/daybook_fetch.py"
+          cp src/build.txt "$W/build.py"
+          cp src/channels.json src/topics.json src/cache.json "$W/"
+          cp icons/*.jpg "$W/icons/" 2>/dev/null || true
+          : > "$W/existing.txt"
+          python3 -I "$W/build.py" "$W" "$W/existing.txt"
+          echo "W=$W" >> "$GITHUB_ENV"
+      - name: Copy results into the site
+        run: |
+          rm -f thumbs/*.jpg
+          find "$W/thumbs" -name '*.jpg' -size +0 -exec cp {} thumbs/ \;
+          cp "$W/out/feed.js" feed.js
+          cp "$W/out/cache.json" src/cache.json
+          for f in "$W"/icons/*.jpg; do
+            n=$(basename "$f"); [ -s "$f" ] && [ ! -e "icons/$n" ] && cp "$f" "icons/$n" || true
+          done
+      - name: Save to GitHub
+        run: |
+          git config user.name "jimw137"
+          git config user.email "jimw137@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "Nothing changed"; exit 0; }
+          git commit -m "Evening feed $(date -u +%F)"
+          git pull --rebase origin main
+          git push origin HEAD:main
